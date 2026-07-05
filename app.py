@@ -5,6 +5,7 @@ import sqlite3
 import time
 import threading
 import asyncio
+import sys
 
 TOKEN = "8757926776:AAH7nCAC0B8X3S_iFaBm6A11Ta4fmiHmFpU"
 app = Flask(__name__)
@@ -99,10 +100,17 @@ def home():
     return "OK", 200
 
 def run_bot():
+    # СОЗДАЁМ EVENT LOOP ВРУЧНУЮ (ФИКС ДЛЯ PYTHON 3.14+)
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
     application = Application.builder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.ALL, handle_all))
     application.run_polling()
 
 if __name__ == '__main__':
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080, debug=False), daemon=True).start()
     run_bot()
