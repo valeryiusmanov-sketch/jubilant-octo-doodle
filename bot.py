@@ -12,9 +12,7 @@ ADMIN_ID = 8205534130
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Хранилище мутов: {chat_id: datetime_окончания}
 muted_chats = {}
-# Хранилище варнов: {chat_id: количество}
 warns = {}
 
 @dp.message(F.text & F.chat.type == "private")
@@ -23,7 +21,6 @@ async def handle_private_messages(message: Message):
     text = message.text or ""
     user_id = message.from_user.id
 
-    # === 1. УДАЛЕНИЕ СООБЩЕНИЙ ОТ СОБЕСЕДНИКА ===
     if user_id != bot.id:
         if chat_id in muted_chats and datetime.now() < muted_chats[chat_id]:
             try:
@@ -39,9 +36,6 @@ async def handle_private_messages(message: Message):
                 print(f"Ошибка удаления: {e}")
         return
 
-    # === 2. ОБРАБОТКА КОМАНД ===
-
-    # .mute N
     if text.startswith(".mute "):
         try:
             minutes = int(text.split()[1])
@@ -58,7 +52,6 @@ async def handle_private_messages(message: Message):
         asyncio.create_task(auto_unmute(chat_id, minutes))
         return
 
-    # .unmute
     if text == ".unmute":
         if chat_id in muted_chats:
             del muted_chats[chat_id]
@@ -68,7 +61,6 @@ async def handle_private_messages(message: Message):
             await message.answer("ℹ️ Мут не активен")
         return
 
-    # .help
     if text == ".help":
         await message.answer(
             "👋 RootExe — управление ЛС\n\n"
@@ -83,7 +75,6 @@ async def handle_private_messages(message: Message):
         )
         return
 
-    # .info
     if text == ".info":
         chat = await bot.get_chat(chat_id)
         await message.answer(
@@ -93,7 +84,6 @@ async def handle_private_messages(message: Message):
         )
         return
 
-    # .spam текст N
     if text.startswith(".spam "):
         parts = text.split(maxsplit=2)
         if len(parts) < 3:
@@ -111,7 +101,6 @@ async def handle_private_messages(message: Message):
             await asyncio.sleep(0.3)
         return
 
-    # .txt текст
     if text.startswith(".txt "):
         t = text.replace(".txt ", "").strip()
         if not t:
@@ -123,7 +112,6 @@ async def handle_private_messages(message: Message):
             await asyncio.sleep(0.15)
         return
 
-    # .warn N
     if text.startswith(".warn "):
         try:
             limit = int(text.split()[1])
@@ -144,7 +132,6 @@ async def handle_private_messages(message: Message):
             asyncio.create_task(auto_unmute(chat_id, 1440))
         return
 
-    # .unwarn
     if text == ".unwarn":
         if chat_id in warns and warns[chat_id] > 0:
             warns[chat_id] -= 1
@@ -164,6 +151,11 @@ async def auto_unmute(chat_id: int, minutes: int):
 
 async def main():
     logging.basicConfig(level=logging.INFO)
+    
+    # ✅ УДАЛЯЕМ ВЕБХУК
+    await bot.delete_webhook(drop_pending_updates=True)
+    print("✅ Вебхук удалён")
+    
     print("🤖 Бот запущен! Пиши .help в любом ЛС")
     await dp.start_polling(bot)
 
