@@ -1,11 +1,10 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 import sqlite3
 import time
-import threading
 import asyncio
-import sys
+import threading
 
 TOKEN = "8757926776:AAH7nCAC0B8X3S_iFaBm6A11Ta4fmiHmFpU"
 app = Flask(__name__)
@@ -14,6 +13,9 @@ db = sqlite3.connect('mute_data.db', check_same_thread=False)
 cursor = db.cursor()
 cursor.execute('CREATE TABLE IF NOT EXISTS muted_chats (chat_id INTEGER PRIMARY KEY, muted_until INTEGER, warn_count INTEGER DEFAULT 0)')
 db.commit()
+
+# Глобальный объект приложения
+application = None
 
 async def handle_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or update.message.from_user.is_bot:
@@ -95,22 +97,45 @@ async def handle_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return "OK", 200
 
-def run_bot():
-    # СОЗДАЁМ EVENT LOOP ВРУЧНУЮ (ФИКС ДЛЯ PYTHON 3.14+)
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+@app.route(f'/{TOKEN}', methods=['POST'])
+async def webhook():
+    global application
+    if application is None:
+        return "Not initialized", 500
     
+    try:
+        json_data = request.get_json(force=True)
+        update = Update.de_json(json_data, application.bot)
+        await application.process_update(update)
+        return "OK", 200
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return "Error", 500
+
+def setup_webhook():
+    """Настраивает вебхук в Telegram"""
+    import requests
+    webhook_url = f"https://jubilant-octo-doodle2.onrender.com/{TOKEN}"
+    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={webhook_url}&drop_pending_updates=true"
+    response = requests.get(url)
+    print(f"Webhook setup: {response.json()}")
+
+def run_bot():
+    global application
+    
+    # Создаём приложение
     application = Application.builder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.ALL, handle_all))
-    application.run_polling()
+    
+    # Настраиваем вебхук
+    setup_webhook()
+    
+    # Запускаем Flask
+    app.run(host='0.0.0.0', port=8080, debug=False)
 
 if __name__ == '__main__':
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080, debug=False), daemon=True).start()
     run_bot()
